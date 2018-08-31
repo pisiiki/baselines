@@ -33,6 +33,7 @@ class VecNormalize(VecEnvWrapper):
         where 'news' is a boolean vector indicating whether each element is new.
         """
         obs, rews, news, infos = self.venv.step_wait()
+        self.ret = np.array([0. if new else ret for ret, new in zip(self.ret, news)])
         self.ret = self.ret * self.gamma + rews
         obs = self._obfilt(obs)
         if self.ret_rms:
@@ -62,5 +63,6 @@ class VecNormalize(VecEnvWrapper):
         """
         Reset all environments
         """
+        self.ret = np.zeros(self.num_envs)
         obs = self.venv.reset()
         return self._obfilt(obs)
