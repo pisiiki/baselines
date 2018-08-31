@@ -6,28 +6,22 @@ import zipfile
 import cloudpickle
 import numpy as np
 
+import gym
 import baselines.common.tf_util as U
-from baselines.common.tf_util import load_state, save_state
 from baselines import logger
 from baselines.common.schedules import LinearSchedule
-from baselines.common import set_global_seeds
-
 from baselines import deepq
 from baselines.deepq.replay_buffer import ReplayBuffer, PrioritizedReplayBuffer
-from baselines.deepq.utils import ObservationInput
-
-from baselines.common.tf_util import get_session
-from baselines.deepq.models import build_q_func
+from baselines.deepq.utils import BatchInput, load_state, save_state
 
 
 class ActWrapper(object):
     def __init__(self, act, act_params):
         self._act = act
         self._act_params = act_params
-        self.initial_state = None
 
     @staticmethod
-    def load_act(path):
+    def load(path):
         with open(path, "rb") as f:
             model_data, act_params = cloudpickle.load(f)
         act = deepq.build_act(**act_params)
@@ -46,10 +40,7 @@ class ActWrapper(object):
     def __call__(self, *args, **kwargs):
         return self._act(*args, **kwargs)
 
-    def step(self, observation, **kwargs):
-        return self._act([observation], **kwargs), None, None, None
-
-    def save_act(self, path=None):
+    def save(self, path=None):
         """Save model to a pickle located at `path`"""
         if path is None:
             path = os.path.join(logger.get_dir(), "model.pkl")
@@ -68,12 +59,8 @@ class ActWrapper(object):
         with open(path, "wb") as f:
             cloudpickle.dump((model_data, self._act_params), f)
 
-    def save(self, path):
-        save_state(path)
-        self.save_act(path+".pickle")
 
-
-def load_act(path):
+def load(path):
     """Load act function that was returned by learn function.
 
     Parameters
@@ -87,14 +74,13 @@ def load_act(path):
         function that takes a batch of observations
         and returns actions.
     """
-    return ActWrapper.load_act(path)
+    return ActWrapper.load(path)
 
 
 def learn(env,
-          network,
-          seed=None,
+          q_func,
           lr=5e-4,
-          total_timesteps=100000,
+          max_timesteps=100000,
           buffer_size=50000,
           exploration_fraction=0.1,
           exploration_final_eps=0.02,
@@ -102,7 +88,6 @@ def learn(env,
           batch_size=32,
           print_freq=100,
           checkpoint_freq=10000,
-          checkpoint_path=None,
           learning_starts=1000,
           gamma=1.0,
           target_network_update_freq=500,
@@ -112,10 +97,7 @@ def learn(env,
           prioritized_replay_beta_iters=None,
           prioritized_replay_eps=1e-6,
           param_noise=False,
-          callback=None,
-          load_path=None,
-          **network_kwargs
-            ):
+          callback=None):
     """Train a deepq model.
 
     Parameters
@@ -134,7 +116,7 @@ def learn(env,
         and returns a tensor of shape (batch_size, num_actions) with values of every action.
     lr: float
         learning rate for adam optimizer
-    total_timesteps: int
+    max_timesteps: int
         number of env steps to optimizer for
     buffer_size: int
         size of the replay buffer
@@ -168,16 +150,12 @@ def learn(env,
         initial value of beta for prioritized replay buffer
     prioritized_replay_beta_iters: int
         number of iterations over which beta will be annealed from initial value
-        to 1.0. If set to None equals to total_timesteps.
+        to 1.0. If set to None equals to max_timesteps.
     prioritized_replay_eps: float
         epsilon to add to the TD errors when updating priorities.
     callback: (locals, globals) -> None
         function called at every steps with state of the algorithm.
         If callback returns true training stops.
-    load_path: str
-        path to load the model from. (default: None)
-    **network_kwargs
-        additional keyword arguments to pass to the network builder. 
 
     Returns
     -------
@@ -187,17 +165,14 @@ def learn(env,
     """
     # Create all the functions necessary to train the model
 
-    sess = get_session()
-    set_global_seeds(seed)
-
-    q_func = build_q_func(network, **network_kwargs)
+    sess = tf.Session()
+    sess.__enter__()
 
     # capture the shape outside the closure so that the env object is not serialized
     # by cloudpickle when serializing make_obs_ph
-
-    observation_space = env.observation_space
+    observation_space_shape = env.observation_space.shape
     def make_obs_ph(name):
-        return ObservationInput(observation_space, name=name)
+        return BatchInput(observation_space_shape, name=name)
 
     act, train, update_target, debug = deepq.build_train(
         make_obs_ph=make_obs_ph,
@@ -216,12 +191,12 @@ def learn(env,
     }
 
     act = ActWrapper(act, act_params)
-  
+
     # Create the replay buffer
     if prioritized_replay:
         replay_buffer = PrioritizedReplayBuffer(buffer_size, alpha=prioritized_replay_alpha)
         if prioritized_replay_beta_iters is None:
-            prioritized_replay_beta_iters = total_timesteps
+            prioritized_replay_beta_iters = max_timesteps
         beta_schedule = LinearSchedule(prioritized_replay_beta_iters,
                                        initial_p=prioritized_replay_beta0,
                                        final_p=1.0)
@@ -229,7 +204,7 @@ def learn(env,
         replay_buffer = ReplayBuffer(buffer_size)
         beta_schedule = None
     # Create the schedule for exploration starting from 1.
-    exploration = LinearSchedule(schedule_timesteps=int(exploration_fraction * total_timesteps),
+    exploration = LinearSchedule(schedule_timesteps=int(exploration_fraction * max_timesteps),
                                  initial_p=1.0,
                                  final_p=exploration_final_eps)
 
@@ -241,23 +216,10 @@ def learn(env,
     saved_mean_reward = None
     obs = env.reset()
     reset = True
-
     with tempfile.TemporaryDirectory() as td:
-        td = checkpoint_path or td
-
-        model_file = os.path.join(td, "model")
         model_saved = False
-        
-        if tf.train.latest_checkpoint(td) is not None:
-            load_state(model_file)
-            logger.log('Loaded model from {}'.format(model_file))
-            model_saved = True
-        elif load_path is not None:
-            load_state(load_path)
-            logger.log('Loaded model from {}'.format(load_path))
-        
-
-        for t in range(total_timesteps):
+        model_file = os.path.join(td, "model")
+        for t in range(max_timesteps):
             if callback is not None:
                 if callback(locals(), globals()):
                     break

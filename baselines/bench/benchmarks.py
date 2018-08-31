@@ -9,8 +9,6 @@ _atariexpl7 = ['Freeway', 'Gravitar', 'MontezumaRevenge', 'Pitfall', 'PrivateEye
 _BENCHMARKS = []
 
 remove_version_re = re.compile(r'-v\d+$')
-
-
 def register_benchmark(benchmark):
     for b in _BENCHMARKS:
         if b['name'] == benchmark['name']:
@@ -59,7 +57,7 @@ register_benchmark({
 register_benchmark({
     'name': 'Atari10M',
     'description': '7 Atari games from Mnih et al. (2013), with pixel observations, 10M timesteps',
-    'tasks': [{'desc': _game, 'env_id': _game + _ATARI_SUFFIX, 'trials': 6, 'num_timesteps': int(10e6)} for _game in _atari7]
+    'tasks': [{'desc': _game, 'env_id': _game + _ATARI_SUFFIX, 'trials': 2, 'num_timesteps': int(10e6)} for _game in _atari7]
 })
 
 register_benchmark({
@@ -84,9 +82,8 @@ _mujocosmall = [
 register_benchmark({
     'name': 'Mujoco1M',
     'description': 'Some small 2D MuJoCo tasks, run for 1M timesteps',
-    'tasks': [{'env_id': _envid, 'trials': 6, 'num_timesteps': int(1e6)} for _envid in _mujocosmall]
+    'tasks': [{'env_id': _envid, 'trials': 3, 'num_timesteps': int(1e6)} for _envid in _mujocosmall]
 })
-
 register_benchmark({
     'name': 'MujocoWalkers',
     'description': 'MuJoCo forward walkers, run for 8M, humanoid 100M',
@@ -139,13 +136,5 @@ register_benchmark({
     'name': 'Atari50_10M',
     'description': '47 Atari games from Mnih et al. (2013), with pixel observations, 10M timesteps',
     'tasks': [{'desc': _game, 'env_id': _game + _ATARI_SUFFIX, 'trials': 2, 'num_timesteps': int(10e6)} for _game in _atari50]
-})
-
-# HER DDPG
-
-register_benchmark({
-    'name': 'HerDdpg',
-    'description': 'Smoke-test only benchmark of HER',
-    'tasks': [{'trials': 1, 'env_id': 'FetchReach-v1'}]
 })
 
