@@ -56,7 +56,13 @@ class SubprocVecEnv(VecEnv):
         self.waiting = True
 
     def step_wait(self):
-        results = tuple(remote.recv() for remote in self.remotes)
+        results = [None]*len(self.remotes)
+        while None in results:
+            for i in range(len(self.remotes)):
+                if remotes[i].poll():
+                    results[i] = remotes[i].recv()
+
+        # results = tuple(remote.recv() for remote in self.remotes)
         self.waiting = False
 
         for e in results:

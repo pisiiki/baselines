@@ -294,7 +294,7 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
                     end = start + envsperbatch
                     mbenvinds = envinds[start:end]
                     mbflatinds = flatinds[mbenvinds].ravel()
-                    slices_obs = tuple(arr[mbflatinds] for arr in obs)
+                    slices_obs = [arr[mbflatinds] for arr in obs]
                     slices = (arr[mbflatinds] for arr in (returns, masks, actions, values, neglogpacs))
                     mbstates = states[mbenvinds]
                     mblossvals.append(model.train(lrnow, cliprangenow, slices_obs, *slices, mbstates, tf_timeout_in_ms))
