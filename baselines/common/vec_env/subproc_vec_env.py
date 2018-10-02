@@ -59,8 +59,8 @@ class SubprocVecEnv(VecEnv):
         results = [None]*len(self.remotes)
         while None in results:
             for i in range(len(self.remotes)):
-                if remotes[i].poll():
-                    results[i] = remotes[i].recv()
+                if self.remotes[i].poll():
+                    results[i] = self.remotes[i].recv()
 
         # results = tuple(remote.recv() for remote in self.remotes)
         self.waiting = False
