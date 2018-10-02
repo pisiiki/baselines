@@ -56,19 +56,12 @@ class SubprocVecEnv(VecEnv):
         self.waiting = True
 
     def step_wait(self):
-        results = [None]*len(self.remotes)
-        while None in results:
-            for i in range(len(self.remotes)):
-                if self.remotes[i].poll():
-                    results[i] = self.remotes[i].recv()
-
-        # results = tuple(remote.recv() for remote in self.remotes)
+        results = [remote.recv() for remote in self.remotes]
         self.waiting = False
 
-        for e in results:
-            if type(e) == str:
-                self.close()
-                raise RuntimeError(e)
+        if (type(r) is str for r in results):
+            self.close()
+            raise RuntimeError(r)
 
         obs, rews, dones, infos = zip(*results)
 
