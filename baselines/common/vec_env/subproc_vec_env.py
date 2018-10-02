@@ -59,9 +59,10 @@ class SubprocVecEnv(VecEnv):
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
 
-        if (type(r) is str for r in results):
-            self.close()
-            raise RuntimeError(r)
+        for e in results:
+            if type(e) is str:
+                self.close()
+                raise RuntimeError(e)
 
         obs, rews, dones, infos = zip(*results)
 
