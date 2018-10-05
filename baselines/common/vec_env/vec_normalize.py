@@ -7,13 +7,13 @@ class VecNormalize(VecEnvWrapper):
     """
     Vectorized environment base class
     """
-    def __init__(self, venv, ob=True, ret=True, clipob=10., cliprew=10., gamma=0.99, epsilon=1e-8, mask = None):
+    def __init__(self, venv, ob=True, ret=True, clipob=10., cliprew=10., gamma=0.99, epsilon=1e-8, norm_required = None):
         VecEnvWrapper.__init__(self, venv)
 
         if type(self.observation_space) == gym.spaces.Tuple:
             self.ob_rms = tuple(RunningMeanStd(shape=i.shape) for i in self.observation_space.spaces) if ob else None
-            if not mask:
-                mask = [True]*len(self.observation_space.spaces)
+            if not norm_required:
+                norm_required = [True]*len(self.observation_space.spaces)
         else:
             self.ob_rms = RunningMeanStd(shape=self.observation_space.shape) if ob else None
 
@@ -23,7 +23,7 @@ class VecNormalize(VecEnvWrapper):
         self.ret = np.zeros(self.num_envs)
         self.gamma = gamma
         self.epsilon = epsilon
-        self.mask = mask
+        self.norm_required = norm_required
 
     def step_wait(self):
         """
@@ -49,7 +49,7 @@ class VecNormalize(VecEnvWrapper):
                 obs = tuple(
                     np.clip(
                         (obs_i - ob_rms_i.mean) / np.sqrt(ob_rms_i.var + self.epsilon), -self.clipob, self.clipob
-                    ) if mask_i else obs_i for obs_i, ob_rms_i, mask_i in zip(obs, self.ob_rms, self.mask)
+                    ) if norm_i else obs_i for obs_i, ob_rms_i, norm_i in zip(obs, self.ob_rms, self.norm_required)
                 )
                 return obs
             else:
