@@ -251,15 +251,30 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
     assert nbatch % nminibatches == 0
     nbatch_train = nbatch // nminibatches
 
+    def check_stability():
+        if np.isnan(mblossvals).any():
+            raise RuntimeError('NaN in PPO2 mblossvals ({} updates).'.format(update))
+        if np.isinf(mblossvals).any():
+            raise RuntimeError('Inf. in PPO2 mblossvals ({} updates).'.format(update))
+
+    def terminate():
+        check_stability()
+        if save_interval:
+            save()
+        if close_env:
+            env.close()
+        return model
+
     t_first_update_start = time.time()
     while True:
+        mblossvals = []
+
         t_update_start = time.time()
 
         update += 1
+
         if total_timesteps is not None and update == nupdates + 1:
-            break
-        if wall_t_end is not None and t_update_start > wall_t_end:
-            break
+            return terminate()
 
         if wall_t_end is not None:
             frac = min(1.,(t_update_start - wall_t_start) / (wall_t_end-wall_t_start))
@@ -271,7 +286,6 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
         cliprangenow = cliprange(frac)
         obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run() #pylint: disable=E0632
         epinfobuf.extend(epinfos)
-        mblossvals = []
         if states is None: # nonrecurrent version
             inds = np.arange(nbatch)
             for _ in range(noptepochs):
@@ -284,13 +298,15 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
                     mblossvals.append(model.train(lrnow, cliprangenow, slices_obs, *slices, tf_timeout_in_ms))
         else: # recurrent version
             assert nenvs % nminibatches == 0
-            # envsperbatch = nenvs // nminibatches
             envinds = np.arange(nenvs)
             flatinds = np.arange(nenvs * nsteps).reshape(nenvs, nsteps)
             envsperbatch = nbatch_train // nsteps
             for _ in range(noptepochs):
                 np.random.shuffle(envinds)
                 for start in range(0, nenvs, envsperbatch):
+                    if wall_t_end is not None and time.time() > wall_t_end:
+                        return terminate()
+
                     end = start + envsperbatch
                     mbenvinds = envinds[start:end]
                     mbflatinds = flatinds[mbenvinds].ravel()
@@ -299,14 +315,9 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
                     mbstates = states[mbenvinds]
                     mblossvals.append(model.train(lrnow, cliprangenow, slices_obs, *slices, mbstates, tf_timeout_in_ms))
 
+        check_stability()
 
-        if np.isnan(mblossvals).any():
-            raise RuntimeError('NaN in PPO2 mblossvals ({} updates).'.format(update))
-
-        if np.isinf(mblossvals).any():
-            raise RuntimeError('Inf. in PPO2 mblossvals ({} updates).'.format(update))
-
-        if update % log_interval == 0 or update == 1:
+        if len(mblossvals) > 0 and (update % log_interval == 0 or update == 1):
             lossvals = np.mean(mblossvals, axis=0)
             t_update_end = time.time()
             fps = int(nbatch / (t_update_end - t_update_start))
@@ -328,13 +339,7 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
         if save_interval and (update % save_interval == 0 or update == 1) and logger.get_dir():
             save()
 
-    if save_interval:
-        save()
-
-    if close_env:
-        env.close()
-
-    return model
+    return terminate()
 
 def safemean(xs):
     return np.nan if len(xs) == 0 else np.mean(xs)
