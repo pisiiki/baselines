@@ -54,7 +54,19 @@ class Model(object):
         trainer = fn_create_optimizer(lr=LR)
         _train = trainer.apply_gradients(grads)
 
-        def train(lr, cliprange, obs, returns, masks, actions, values, neglogpacs, states=None, timeout_in_ms=None):
+        def train(
+                lr,
+                cliprange,
+                obs,
+                returns,
+                masks,
+                actions,
+                values,
+                neglogpacs,
+                states=None,
+                inds=None,
+                timeout_in_ms=None
+        ):
             advs = returns - values
             advs = (advs - advs.mean()) / (advs.std() + 1e-8)
             td_map = {train_model.X:obs, A:actions, ADV:advs, R:returns, LR:lr,
@@ -62,6 +74,8 @@ class Model(object):
             if states is not None:
                 td_map[train_model.S] = states
                 td_map[train_model.M] = masks
+                if inds is not None:
+                    td_map[train_model.I] = inds
             r = sess.run(
                 [pg_loss, vf_loss, entropy, approxkl, clipfrac, _train],
                 td_map,
@@ -117,6 +131,7 @@ class Runner(object):
         self.nsteps = nsteps
         self.states = model.initial_state
         self.dones = [False for _ in range(nenv)]
+        self.inds = np.arange(nenv)
 
     def run(self):
         mb_rewards, mb_actions, mb_values, mb_dones, mb_neglogpacs = [],[],[],[],[]
@@ -127,7 +142,7 @@ class Runner(object):
         mb_states = self.states
         epinfos = []
         for _ in range(self.nsteps):
-            actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones)
+            actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones, self.inds)
             if type(self.env.observation_space) is gym.spaces.Tuple:
                 for i in range(len(self.obs)):
                     mb_obs[i].append(self.obs[i].copy())
@@ -157,7 +172,7 @@ class Runner(object):
         mb_values = np.asarray(mb_values, dtype=np.float32)
         mb_neglogpacs = np.asarray(mb_neglogpacs, dtype=np.float32)
         mb_dones = np.asarray(mb_dones, dtype=np.bool)
-        last_values = self.model.value(self.obs, self.states, self.dones)
+        last_values = self.model.value(self.obs, self.states, self.dones, self.inds)
         #discount/bootstrap off value fn
         mb_returns = np.zeros_like(mb_rewards)
         mb_advs = np.zeros_like(mb_rewards)
@@ -287,15 +302,17 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
         obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run() #pylint: disable=E0632
         epinfobuf.extend(epinfos)
         if states is None: # nonrecurrent version
-            inds = np.arange(nbatch)
+            # inds = np.arange(nbatch)
             for _ in range(noptepochs):
-                np.random.shuffle(inds)
+                # np.random.shuffle(inds)
                 for start in range(0, nbatch, nbatch_train):
                     # end = start + nbatch_train
                     # mbinds = inds[start:end]
                     slices_obs = tuple(arr[mbflatinds] for arr in obs)
                     slices = (arr[mbflatinds] for arr in (returns, masks, actions, values, neglogpacs))
-                    mblossvals.append(model.train(lrnow, cliprangenow, slices_obs, *slices, tf_timeout_in_ms))
+                    mblossvals.append(
+                        model.train(lrnow, cliprangenow, slices_obs, *slices, None, None, tf_timeout_in_ms)
+                    )
         else: # recurrent version
             assert nenvs % nminibatches == 0
             envinds = np.arange(nenvs)
@@ -313,7 +330,9 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
                     slices_obs = [arr[mbflatinds] for arr in obs]
                     slices = (arr[mbflatinds] for arr in (returns, masks, actions, values, neglogpacs))
                     mbstates = states[mbenvinds]
-                    mblossvals.append(model.train(lrnow, cliprangenow, slices_obs, *slices, mbstates, tf_timeout_in_ms))
+                    mblossvals.append(
+                        model.train(lrnow, cliprangenow, slices_obs, *slices, mbstates, mbenvinds, tf_timeout_in_ms)
+                    )
 
         check_stability()
 
