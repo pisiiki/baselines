@@ -72,7 +72,11 @@ class Model(object):
             td_map = {train_model.X:obs, A:actions, ADV:advs, R:returns, LR:lr,
                     CLIPRANGE:cliprange, OLDNEGLOGPAC:neglogpacs, OLDVPRED:values}
             if states is not None:
-                td_map[train_model.S] = states
+                if type(states) is dict:
+                    for k, v in train_model.S.items():
+                        td_map[v] = states[k]
+                else:
+                    td_map[train_model.S] = states
                 td_map[train_model.M] = masks
                 if inds is not None:
                     td_map[train_model.I] = inds
@@ -329,7 +333,10 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
                     mbflatinds = flatinds[mbenvinds].ravel()
                     slices_obs = [arr[mbflatinds] for arr in obs]
                     slices = (arr[mbflatinds] for arr in (returns, masks, actions, values, neglogpacs))
-                    mbstates = states[mbenvinds]
+                    if type(states) is dict:
+                        mbstates = {k:v[mbenvinds] for k, v in states.items()}
+                    else:
+                        mbstates = states[mbenvinds]
                     mblossvals.append(
                         model.train(lrnow, cliprangenow, slices_obs, *slices, mbstates, mbenvinds, tf_timeout_in_ms)
                     )
