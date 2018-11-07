@@ -334,7 +334,7 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
                     else:
                         mbstates = states[mbenvinds]
                     mblossvals.append(
-                        model.train(lrnow, cliprangenow, slices_obs, *slices, mbstates, mbenvinds, tf_timeout_in_ms)
+                        model.train(lrnow, cliprangenow, slices_obs, *slices, mbstates, tf_timeout_in_ms)
                     )
 
         check_stability()
