@@ -64,7 +64,6 @@ class Model(object):
                 values,
                 neglogpacs,
                 states=None,
-                inds=None,
                 timeout_in_ms=None
         ):
             advs = returns - values
@@ -78,8 +77,6 @@ class Model(object):
                 else:
                     td_map[train_model.S] = states
                 td_map[train_model.M] = masks
-                if inds is not None:
-                    td_map[train_model.I] = inds
             r = sess.run(
                 [pg_loss, vf_loss, entropy, approxkl, clipfrac, _train],
                 td_map,
@@ -135,7 +132,6 @@ class Runner(object):
         self.nsteps = nsteps
         self.states = model.initial_state
         self.dones = [False for _ in range(nenv)]
-        self.inds = np.arange(nenv)
 
     def run(self):
         mb_rewards, mb_actions, mb_values, mb_dones, mb_neglogpacs = [],[],[],[],[]
@@ -146,7 +142,7 @@ class Runner(object):
         mb_states = self.states
         epinfos = []
         for _ in range(self.nsteps):
-            actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones, self.inds)
+            actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones)
             if type(self.env.observation_space) is gym.spaces.Tuple:
                 for i in range(len(self.obs)):
                     mb_obs[i].append(self.obs[i].copy())
@@ -176,7 +172,7 @@ class Runner(object):
         mb_values = np.asarray(mb_values, dtype=np.float32)
         mb_neglogpacs = np.asarray(mb_neglogpacs, dtype=np.float32)
         mb_dones = np.asarray(mb_dones, dtype=np.bool)
-        last_values = self.model.value(self.obs, self.states, self.dones, self.inds)
+        last_values = self.model.value(self.obs, self.states, self.dones)
         #discount/bootstrap off value fn
         mb_returns = np.zeros_like(mb_rewards)
         mb_advs = np.zeros_like(mb_rewards)
