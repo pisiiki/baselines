@@ -133,6 +133,16 @@ class Runner(object):
         self.states = model.initial_state
         self.dones = [False for _ in range(nenv)]
 
+    def run_no_stats(self):
+        for i in range(self.nsteps):
+            actions, _, self.states, _ = self.model.step(self.obs, self.states, self.dones)
+            obs, _, self.dones, _ = self.env.step(actions)
+            if type(self.env.observation_space) is gym.spaces.Tuple:
+                for self_obs_i, obs_i in zip(self.obs, obs):
+                    self_obs_i[:] = obs_i
+            else:
+                self.obs[:] = obs
+
     def run(self):
         mb_rewards, mb_actions, mb_values, mb_dones, mb_neglogpacs = [],[],[],[],[]
         if type(self.env.observation_space) is gym.spaces.Tuple:
