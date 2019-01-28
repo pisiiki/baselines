@@ -51,7 +51,7 @@ class Model(object):
         if max_grad_norm is not None:
             grads, _grad_norm = tf.clip_by_global_norm(grads, max_grad_norm)
         grads = list(zip(grads, params))
-        trainer = fn_create_optimizer(lr=LR)
+        trainer = fn_create_optimizer(lr=LR, loss=loss)
         _train = trainer.apply_gradients(grads)
 
         def train(
