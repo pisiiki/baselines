@@ -318,7 +318,7 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
             runner_run_t_total += runner_run_t_end - runner_run_t_start
             avg_step_t = runner_run_t_total / (update * nbatch)
             if avg_step_t > max_step_t:
-                raise RuntimeError('Runner avg_step_t of {} exceeded max_step_t of {}.'.format(avg_step_t, max_step_t))
+                return terminate()
             
         epinfobuf.extend(epinfos)
         if states is None: # nonrecurrent version
