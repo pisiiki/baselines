@@ -224,6 +224,7 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
 
           total_timesteps=None,
           wall_t_end=None, wall_t_start=None,
+          max_step_t=None,
 
           fn_create_optimizer=None,
           close_env = True,
@@ -290,6 +291,7 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
             env.close()
         return model
 
+    runner_run_t_total = 0.
     t_first_update_start = time.time()
     while True:
         mblossvals = []
@@ -309,7 +311,15 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
         lrnow = lr(frac)
 
         cliprangenow = cliprange(frac)
+        runner_run_t_start = time.time()
         obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run() #pylint: disable=E0632
+        runner_run_t_end = time.time()
+        if max_step_t != None and update > 1:
+            runner_run_t_total += runner_run_t_end - runner_run_t_start
+            avg_step_t = runner_run_t_total / (update * nbatch)
+            if avg_step_t > max_step_t:
+                raise RuntimeError('Runner avg_step_t of {} exceeded max_step_t of {}.'.format(avg_step_t, max_step_t))
+            
         epinfobuf.extend(epinfos)
         if states is None: # nonrecurrent version
             # inds = np.arange(nbatch)
