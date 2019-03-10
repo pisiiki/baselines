@@ -1,5 +1,6 @@
 from multiprocessing import Process, Pipe
 
+import sys, traceback
 import numpy as np
 from baselines.common.vec_env import VecEnv, CloudpickleWrapper
 
@@ -16,7 +17,8 @@ def _worker(remote, parent_remote, env_fn_wrapper):
                     ob = env.reset()
                 remote.send((ob, reward, done, info))
             except BaseException as e:
-                remote.send(str(e))
+                exc_type, exc_obj, tb = sys.exc_info()
+                remote.send(str(e) + ' - ' + str(traceback.format_exception(exc_type, exc_obj, tb)))
         elif cmd == 'reset':
             ob = env.reset()
             remote.send(ob)
