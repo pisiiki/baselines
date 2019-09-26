@@ -20,8 +20,12 @@ def _worker(remote, parent_remote, env_fn_wrapper):
                 exc_type, exc_obj, tb = sys.exc_info()
                 remote.send(str(e) + ' - ' + str(traceback.format_exception(exc_type, exc_obj, tb)))
         elif cmd == 'reset':
-            ob = env.reset()
-            remote.send(ob)
+            try:
+                ob = env.reset()
+                remote.send(ob)
+            except BaseException as e:
+                exc_type, exc_obj, tb = sys.exc_info()
+                remote.send(str(e) + ' - ' + str(traceback.format_exception(exc_type, exc_obj, tb)))
         elif cmd == 'reset_task':
             ob = env.reset_task()
             remote.send(ob)
@@ -61,10 +65,10 @@ class SubprocVecEnv(VecEnv):
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
 
-        for e in results:
-            if type(e) is str:
+        for i in results:
+            if type(i) is str:
                 self.close()
-                raise RuntimeError(e)
+                raise RuntimeError(i)
 
         obs, rews, dones, infos = zip(*results)
 
@@ -75,6 +79,12 @@ class SubprocVecEnv(VecEnv):
         for remote in self.remotes:
             remote.send(('reset', None))
         obs = [remote.recv() for remote in self.remotes]
+        
+        for i in obs:
+            if type(i) is str:
+                self.close()
+                raise RuntimeError(i)
+
         return SubprocVecEnv._stack_obs(obs)
 
     def reset_task(self):
