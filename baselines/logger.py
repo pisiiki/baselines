@@ -144,7 +144,8 @@ class TensorBoardOutputFormat(KVWriter):
         self.step = 1
         prefix = 'events'
         path = osp.join(osp.abspath(dir), prefix)
-        import tensorflow as tf
+        import tensorflow.compat.v1 as tf
+        tf.disable_v2_behavior()
         from tensorflow.python import pywrap_tensorflow
         from tensorflow.core.util import event_pb2
         from tensorflow.python.util import compat
@@ -437,7 +438,8 @@ def read_tb(path):
     import numpy as np
     from glob import glob
     from collections import defaultdict
-    import tensorflow as tf
+    import tensorflow.compat.v1 as tf
+    tf.disable_v2_behavior()
     if osp.isdir(path):
         fnames = glob(osp.join(path, "events.*"))
     elif osp.basename(path).startswith("events."):

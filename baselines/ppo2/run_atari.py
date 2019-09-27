@@ -6,9 +6,8 @@ from baselines.common.vec_env.vec_frame_stack import VecFrameStack
 from baselines.ppo2 import ppo2
 from baselines.ppo2.policies import CnnPolicy, LstmPolicy, LnLstmPolicy
 import multiprocessing
-import tensorflow as tf
-
-
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 def train(env_id, num_timesteps, seed, policy):
 
     ncpu = multiprocessing.cpu_count()

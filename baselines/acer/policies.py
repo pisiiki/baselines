@@ -1,5 +1,6 @@
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 from baselines.ppo2.policies import nature_cnn
 from baselines.a2c.utils import fc, batch_to_seq, seq_to_batch, lstm, sample
 

@@ -9,8 +9,9 @@ def train(env_id, num_timesteps, seed):
     from baselines.ppo2 import ppo2
     from baselines.ppo2.policies import MlpPolicy
     import gym
-    import tensorflow as tf
-    from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
+    import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
     ncpu = 1
     config = tf.ConfigProto(allow_soft_placement=True,
                             intra_op_parallelism_threads=ncpu,

@@ -68,7 +68,8 @@ class EzPickle(object):
 
 def set_global_seeds(i):
     try:
-        import tensorflow as tf
+        import tensorflow.compat.v1 as tf
+        tf.disable_v2_behavior()
     except ImportError:
         pass
     else:

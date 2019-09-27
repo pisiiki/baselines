@@ -5,7 +5,8 @@ import importlib
 import inspect
 import functools
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import numpy as np
 
 from baselines.common import tf_util as U

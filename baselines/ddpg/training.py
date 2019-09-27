@@ -8,7 +8,8 @@ import baselines.common.tf_util as U
 
 from baselines import logger
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 from mpi4py import MPI
 
 

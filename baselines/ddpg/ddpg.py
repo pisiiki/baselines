@@ -2,7 +2,8 @@ from copy import copy
 from functools import reduce
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import tensorflow.contrib as tc
 
 from baselines import logger

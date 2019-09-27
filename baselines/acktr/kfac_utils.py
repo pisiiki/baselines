@@ -1,5 +1,5 @@
-import tensorflow as tf
-
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 def gmatmul(a, b, transpose_a=False, transpose_b=False, reduce_dim=None):
     assert reduce_dim is not None
 

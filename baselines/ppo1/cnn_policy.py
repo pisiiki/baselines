@@ -1,5 +1,6 @@
 import baselines.common.tf_util as U
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import gym
 from baselines.common.distributions import make_pdtype
 

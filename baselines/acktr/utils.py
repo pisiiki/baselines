@@ -1,5 +1,5 @@
-import tensorflow as tf
-
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 def dense(x, size, name, weight_init=None, bias_init=0, weight_loss_dict=None, reuse=None):
     with tf.variable_scope(name, reuse=reuse):
         assert (len(tf.get_variable_scope().name.split('/')) == 2)

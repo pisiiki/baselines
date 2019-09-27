@@ -10,8 +10,8 @@ import gym
 
 import matplotlib.pyplot as plt
 import numpy as np
-import tensorflow as tf
-
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 from baselines.gail import run_mujoco
 from baselines.gail import mlp_policy
 from baselines.common import set_global_seeds, tf_util as U

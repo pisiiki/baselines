@@ -3,7 +3,8 @@ from baselines/ppo1/mlp_policy.py and add simple modification
 (1) add reuse argument
 (2) cache the `stochastic` placeholder
 '''
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import gym
 
 import baselines.common.tf_util as U

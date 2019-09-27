@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 from baselines import logger
 from baselines.common.cmd_util import make_mujoco_env, mujoco_arg_parser
 from baselines.acktr.acktr_cont import learn

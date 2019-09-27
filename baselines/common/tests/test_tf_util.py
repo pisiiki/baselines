@@ -1,5 +1,6 @@
 # tests for tf_util
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 from baselines.common.tf_util import (
     function,
     initialize,

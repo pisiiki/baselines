@@ -93,7 +93,8 @@ The functions in this file can are used to create the following functions:
     Q' is set to Q once every 10000 updates training steps.
 
 """
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import baselines.common.tf_util as U
 
 

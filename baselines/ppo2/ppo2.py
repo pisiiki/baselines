@@ -3,7 +3,8 @@ import time
 import joblib
 import numpy as np
 import os.path as osp
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 from baselines import logger
 from collections import deque
 from baselines.common import explained_variance

@@ -9,8 +9,8 @@ import gym
 import logging
 from tqdm import tqdm
 
-import tensorflow as tf
-
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 from baselines.gail import mlp_policy
 from baselines import bench
 from baselines import logger

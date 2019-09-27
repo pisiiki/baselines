@@ -13,7 +13,8 @@ from baselines.ddpg.memory import Memory
 from baselines.ddpg.noise import *
 
 import gym
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 from mpi4py import MPI
 
 def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):

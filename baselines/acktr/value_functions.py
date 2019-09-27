@@ -2,7 +2,8 @@ from baselines import logger
 import numpy as np
 import baselines.common as common
 from baselines.common import tf_util as U
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 from baselines.acktr import kfac
 from baselines.acktr.utils import dense
 
