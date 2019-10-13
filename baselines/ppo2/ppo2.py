@@ -20,8 +20,8 @@ class Model(object):
 
         sess = tf.get_default_session()
 
-        act_model = policy(sess, ob_space, ac_space, nbatch_act, 1, reuse=False)
-        train_model = policy(sess, ob_space, ac_space, nbatch_train, nsteps, reuse=True)
+        act_model = policy(sess, ob_space, ac_space, nbatch_act, 1, reuse=False, training = False)
+        train_model = policy(sess, ob_space, ac_space, nbatch_train, nsteps, reuse=True, training = True)
 
         A = train_model.pdtype.sample_placeholder([None])
         ADV = tf.placeholder(tf.float32, [None])
