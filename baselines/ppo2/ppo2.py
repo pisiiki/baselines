@@ -45,6 +45,12 @@ class Model(object):
         pg_loss = tf.reduce_mean(tf.maximum(pg_losses, pg_losses2))
         approxkl = .5 * tf.reduce_mean(tf.square(neglogpac - OLDNEGLOGPAC))
         clipfrac = tf.reduce_mean(tf.to_float(tf.greater(tf.abs(ratio - 1.0), CLIPRANGE)))
+
+        tmp = tf.losses.get_regularization_losses()
+        print('Regularization losses:')
+        for i in tmp:
+            print('{} {}'.format(i.shape.as_list(), i.name))
+
         loss = pg_loss - entropy * ent_coef + vf_loss * vf_coef + tf.losses.get_regularization_loss()
         with tf.variable_scope('model'):
             params = tf.trainable_variables()
