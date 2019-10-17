@@ -59,10 +59,10 @@ def conv(x, scope, *, nf, rf, stride, pad='VALID', init_scale=1.0, data_format='
         if data_format == 'NHWC': b = tf.reshape(b, bshape)
         return b + tf.nn.conv2d(x, w, strides=strides, padding=pad, data_format=data_format)
 
-def fc(x, scope, nh, *, init_scale=1.0, init_bias=0.0, reuse=None):
+def fc(x, scope, nh, *, init_scale=1.0, init_bias=0.0, reuse=None, regularizer=None):
     with tf.variable_scope(scope, reuse=reuse):
         nin = x.get_shape()[1].value
-        w = tf.get_variable("w", [nin, nh], initializer=ortho_init(init_scale), collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.WEIGHTS])
+        w = tf.get_variable("w", [nin, nh], initializer=ortho_init(init_scale), collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.WEIGHTS], regularizer=regularizer)
         b = tf.get_variable("b", [nh], initializer=tf.constant_initializer(init_bias), collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.BIASES])
         return tf.matmul(x, w)+b
 
@@ -82,12 +82,12 @@ def seq_to_batch(h, flat = False):
     else:
         return tf.reshape(tf.stack(values=h, axis=1), [-1])
 
-def lstm(xs, ms, s, scope, nh, init_scale=1.0):
+def lstm(xs, ms, s, scope, nh, init_scale=1.0, regularizer=None):
     nbatch, nin = [v.value for v in xs[0].get_shape()]
     nsteps = len(xs)
     with tf.variable_scope(scope):
-        wx = tf.get_variable("wx", [nin, nh*4], initializer=ortho_init(init_scale), collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.WEIGHTS])
-        wh = tf.get_variable("wh", [nh, nh*4], initializer=ortho_init(init_scale), collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.WEIGHTS])
+        wx = tf.get_variable("wx", [nin, nh*4], initializer=ortho_init(init_scale), collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.WEIGHTS], regularizer=regularizer)
+        wh = tf.get_variable("wh", [nh, nh*4], initializer=ortho_init(init_scale), collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.WEIGHTS], regularizer=regularizer)
         b = tf.get_variable("b", [nh*4], initializer=tf.constant_initializer(0.0), collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.BIASES])
 
     c, h = tf.split(axis=1, num_or_size_splits=2, value=s)
@@ -112,15 +112,15 @@ def _ln(x, g, b, e=1e-5, axes=[1]):
     x = x*g+b
     return x
 
-def lnlstm(xs, ms, s, scope, nh, init_scale=1.0):
+def lnlstm(xs, ms, s, scope, nh, init_scale=1.0, regularizer=None):
     nbatch, nin = [v.value for v in xs[0].get_shape()]
     nsteps = len(xs)
     with tf.variable_scope(scope):
-        wx = tf.get_variable("wx", [nin, nh*4], initializer=ortho_init(init_scale), collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.WEIGHTS])
+        wx = tf.get_variable("wx", [nin, nh*4], initializer=ortho_init(init_scale), collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.WEIGHTS], regularizer=regularizer)
         gx = tf.get_variable("gx", [nh*4], initializer=tf.constant_initializer(1.0))
         bx = tf.get_variable("bx", [nh*4], initializer=tf.constant_initializer(0.0))
 
-        wh = tf.get_variable("wh", [nh, nh*4], initializer=ortho_init(init_scale), collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.WEIGHTS])
+        wh = tf.get_variable("wh", [nh, nh*4], initializer=ortho_init(init_scale), collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.WEIGHTS], regularizer=regularizer)
         gh = tf.get_variable("gh", [nh*4], initializer=tf.constant_initializer(1.0))
         bh = tf.get_variable("bh", [nh*4], initializer=tf.constant_initializer(0.0))
 
