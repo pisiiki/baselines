@@ -10,6 +10,7 @@ class VecNormalize(VecEnvWrapper):
     def __init__(
             self,
             venv: VecEnv,
+            training: bool,
             norm_clip_ob: Optional[float] = 10.,  # None means not normalizing/clipping observations.
             norm_clip_rew: Optional[float] = 10.,  # None means not normalizing/clipping rewards.
             gamma: float = 0.99, # Used to track per env. discounted returns. Should match RL algo. gamma.
@@ -23,6 +24,8 @@ class VecNormalize(VecEnvWrapper):
         assert epsilon > 0.
 
         VecEnvWrapper.__init__(self, venv)
+
+        self._training = training
 
         self.ob_rms = None
         self.ret_rms = None
@@ -56,7 +59,8 @@ class VecNormalize(VecEnvWrapper):
         self.ret = self.ret * self.gamma + rews
         obs = self._obfilt(obs)
         if self.ret_rms:
-            self.ret_rms.update(self.ret)
+            if self._training:
+                self.ret_rms.update(self.ret)
             rews = np.clip(rews / np.sqrt(self.ret_rms.var + self.epsilon), -self.norm_clip_rew, self.norm_clip_rew)
         self.ret[terminals] = 0.
         return obs, rews, terminals, infos
@@ -64,8 +68,9 @@ class VecNormalize(VecEnvWrapper):
     def _obfilt(self, obs):
         if self.ob_rms:
             if type(self.observation_space) == gym.spaces.Tuple:
-                for obs_i, ob_rms_i in zip(obs, self.ob_rms):
-                    ob_rms_i.update(obs_i)
+                if self._training:
+                    for obs_i, ob_rms_i in zip(obs, self.ob_rms):
+                        ob_rms_i.update(obs_i)
                 obs = tuple(
                     np.clip(
                         (obs_i - ob_rms_i.mean) / np.sqrt(ob_rms_i.var + self.epsilon),
@@ -75,7 +80,8 @@ class VecNormalize(VecEnvWrapper):
                 )
 
             else:
-                self.ob_rms.update(obs)
+                if self._training:
+                    self.ob_rms.update(obs)
                 obs = np.clip(
                     (obs - self.ob_rms.mean) / np.sqrt(self.ob_rms.var + self.epsilon),
                     -self.norm_clip_ob,
