@@ -18,6 +18,8 @@ class Model(object):
     def __init__(self, *, policy, ob_space, ac_space, nbatch_act, nbatch_train, nsteps, ent_coef, vf_coef,
                 max_grad_norm, fn_create_optimizer = _default_fn_create_optimizer):
 
+        self.avg_step_t = None
+
         sess = tf.get_default_session()
 
         act_model = policy(sess, ob_space, ac_space, nbatch_act, 1, reuse=False, training = False)
@@ -232,6 +234,7 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
           total_timesteps=None,
           wall_t_end=None, wall_t_start=None,
           max_step_t=None,
+          max_inference_t = None,
 
           fn_create_optimizer=None,
           close_env = True,
@@ -321,11 +324,16 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
         runner_run_t_start = time.time()
         obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run() #pylint: disable=E0632
         runner_run_t_end = time.time()
-        if max_step_t != None and update > 1:
-            runner_run_t_total += runner_run_t_end - runner_run_t_start
-            avg_step_t = runner_run_t_total / (update * nbatch)
-            if avg_step_t > max_step_t:
-                return terminate()
+        if update > 1:
+            if max_step_t != None:
+                runner_run_t_total += runner_run_t_end - runner_run_t_start
+                model.avg_step_t = runner_run_t_total / (update * nbatch)
+                if model.avg_step_t > max_step_t:
+                    return terminate()
+            if max_inference_t != None:
+                avg_inference_t = model.act_model.avg_inference_time()
+                if avg_inference_t is not None and avg_inference_t > max_inference_t:
+                    return terminate()
             
         epinfobuf.extend(epinfos)
         if states is None: # nonrecurrent version
