@@ -331,7 +331,7 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
                 if model.avg_step_t > max_step_t:
                     return terminate()
             if max_inference_t != None:
-                avg_inference_t = model.act_model.avg_inference_time()
+                avg_inference_t = model.act_model.avg_inference_t()
                 if avg_inference_t is not None and avg_inference_t > max_inference_t:
                     return terminate()
             
