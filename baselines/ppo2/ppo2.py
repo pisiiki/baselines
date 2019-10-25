@@ -1,9 +1,11 @@
 import os
+import os.path as osp
 import time
+
 import joblib
 import numpy as np
-import os.path as osp
 import tensorflow.compat.v1 as tf
+
 tf.disable_v2_behavior()
 from baselines import logger
 from collections import deque
@@ -13,12 +15,22 @@ import gym.spaces
 def _default_fn_create_optimizer(lr):
     return tf.train.AdamOptimizer(learning_rate=lr, epsilon=1e-5)
 
+class _MaxInfereceException(Exception):
+    def __init__(self, t:float):
+        super().__init__()
+        self.t = t
+
+class _MaxStepException(Exception):
+    def __init__(self, t:float):
+        super().__init__()
+        self.t = t
 
 class Model(object):
     def __init__(self, *, policy, ob_space, ac_space, nbatch_act, nbatch_train, nsteps, ent_coef, vf_coef,
                 max_grad_norm, fn_create_optimizer = _default_fn_create_optimizer):
 
         self.avg_step_t = None
+        self.avg_inference_t = None
 
         sess = tf.get_default_session()
 
@@ -152,7 +164,7 @@ class Runner(object):
             else:
                 self.obs[:] = obs
 
-    def run(self):
+    def run(self, max_inference_t=None, max_step_t=None):
         mb_rewards, mb_actions, mb_values, mb_dones, mb_neglogpacs = [],[],[],[],[]
         if type(self.env.observation_space) is gym.spaces.Tuple:
             mb_obs = tuple([] for _ in range(len(self.obs)))
@@ -160,8 +172,17 @@ class Runner(object):
             mb_obs = []
         mb_states = self.states
         epinfos = []
-        for _ in range(self.nsteps):
+        for step_idx in range(self.nsteps):
+            a = time.time()
             actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones)
+
+            # check for long inference times
+            b = time.time()
+            if max_inference_t is not None and step_idx > 1:
+                t = (b - a) / len(self.obs)
+                if t > max_inference_t:
+                    raise _MaxInfereceException(t)
+
             if type(self.env.observation_space) is gym.spaces.Tuple:
                 for i in range(len(self.obs)):
                     mb_obs[i].append(self.obs[i].copy())
@@ -172,6 +193,14 @@ class Runner(object):
             mb_neglogpacs.append(neglogpacs)
             mb_dones.append(self.dones)
             obs, rewards, self.dones, infos = self.env.step(actions)
+
+            # check for long env+inference times
+            c = time.time()
+            if max_step_t is not None and step_idx > 0:
+                t = (c - a) / len(self.obs)
+                if t > max_step_t:
+                    raise _MaxStepException(t)
+
             if type(self.env.observation_space) is gym.spaces.Tuple:
                 for dst, src in zip(self.obs, obs):
                     dst[:] = src
@@ -321,20 +350,16 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
         lrnow = lr(frac)
 
         cliprangenow = cliprange(frac)
-        runner_run_t_start = time.time()
-        obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run() #pylint: disable=E0632
-        runner_run_t_end = time.time()
-        if update > 1:
-            if max_step_t != None:
-                runner_run_t_total += runner_run_t_end - runner_run_t_start
-                model.avg_step_t = runner_run_t_total / (update * nbatch)
-                if model.avg_step_t > max_step_t:
-                    return terminate()
-            if max_inference_t != None:
-                avg_inference_t = model.act_model.avg_inference_t()
-                if avg_inference_t is not None and avg_inference_t > max_inference_t:
-                    return terminate()
-            
+
+        try:
+            obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run(max_inference_t, max_step_t)
+        except _MaxInfereceException as e:
+            model.avg_inference_t = e.t
+            return terminate()
+        except _MaxStepException as e:
+            model.avg_step_t = e.t
+            return terminate()
+
         epinfobuf.extend(epinfos)
         if states is None: # nonrecurrent version
             # inds = np.arange(nbatch)
