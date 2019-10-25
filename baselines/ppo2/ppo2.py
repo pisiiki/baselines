@@ -176,10 +176,10 @@ class Runner(object):
             a = time.time()
             actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones)
 
-            # check for long inference times
+            # check for long inference times (per minibatch)
             b = time.time()
             if max_inference_t is not None and step_idx > 1:
-                t = (b - a) / len(self.obs)
+                t = (b - a)
                 if t > max_inference_t:
                     raise _MaxInfereceException(t)
 
@@ -194,7 +194,7 @@ class Runner(object):
             mb_dones.append(self.dones)
             obs, rewards, self.dones, infos = self.env.step(actions)
 
-            # check for long env+inference times
+            # check for long env+inference times (per env)
             c = time.time()
             if max_step_t is not None and step_idx > 0:
                 t = (c - a) / len(self.obs)
