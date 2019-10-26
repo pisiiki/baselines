@@ -174,13 +174,13 @@ class Runner(object):
             mb_obs = []
         mb_states = self.states
         epinfos = []
-        for _ in range(self.nsteps):
+        for nstep in range(self.nsteps):
             self._total_steps += 1
             time_0 = time.time()
             actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones)
 
             # check for long inference times (per minibatch)
-            if max_inference_t is not None and self._total_steps > 100:
+            if max_inference_t is not None and self._total_steps > 100 and self._total_steps > self.nsteps:
                 inference_t = (time.time() - time_0)
                 if inference_t > max_inference_t:
                     raise _MaxInfereceException(inference_t)
@@ -204,7 +204,7 @@ class Runner(object):
                 self._step_t_ravg = step_t if self._step_t_ravg is None else self._step_t_ravg * .99 + step_t * .01
                 if self._step_t_ravg > max_step_t:
                     print('! {} {} > {}'.format(self._total_steps * len(rewards), self._step_t_ravg, max_step_t))
-                    if self._total_steps > 100:
+                    if self._total_steps > 100 and self._total_steps > self.nsteps:
                         raise _MaxStepException(self._step_t_ravg)
 
             if type(self.env.observation_space) is gym.spaces.Tuple:
