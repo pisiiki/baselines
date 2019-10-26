@@ -153,6 +153,8 @@ class Runner(object):
         self.nsteps = nsteps
         self.states = model.initial_state
         self.dones = [False for _ in range(nenv)]
+        self._total_steps = 0
+        self._step_t_ravg = None
 
     def run_no_stats(self):
         for i in range(self.nsteps):
@@ -172,16 +174,16 @@ class Runner(object):
             mb_obs = []
         mb_states = self.states
         epinfos = []
-        for step_idx in range(self.nsteps):
-            a = time.time()
+        for _ in range(self.nsteps):
+            self._total_steps += 1
+            time_0 = time.time()
             actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones)
 
             # check for long inference times (per minibatch)
-            b = time.time()
-            if max_inference_t is not None and step_idx > 1:
-                t = (b - a)
-                if t > max_inference_t:
-                    raise _MaxInfereceException(t)
+            if max_inference_t is not None and self._total_steps > 100:
+                inference_t = (time.time() - time_0)
+                if inference_t > max_inference_t:
+                    raise _MaxInfereceException(inference_t)
 
             if type(self.env.observation_space) is gym.spaces.Tuple:
                 for i in range(len(self.obs)):
@@ -195,11 +197,15 @@ class Runner(object):
             obs, rewards, self.dones, infos = self.env.step(actions)
 
             # check for long env+inference times (per env)
-            c = time.time()
-            if max_step_t is not None and step_idx > 0:
-                t = (c - a) / len(self.obs)
-                if t > max_step_t:
-                    raise _MaxStepException(t)
+            # skip first 10 measurements (optimistic, discard start jitter)
+            if max_step_t is not None and self._total_steps > 10:
+                step_t = (time.time() - time_0) / len(self.obs)
+                # smooth ~100sh
+                self._step_t_ravg = step_t if self._step_t_ravg is None else self._step_t_ravg * .99 + step_t * .01
+                if self._step_t_ravg > max_step_t:
+                    print('! {} > {}'.format(self._step_t_ravg, max_step_t))
+                    if self._total_steps > 100:
+                        raise _MaxStepException(self._step_t_ravg)
 
             if type(self.env.observation_space) is gym.spaces.Tuple:
                 for dst, src in zip(self.obs, obs):
