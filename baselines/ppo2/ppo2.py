@@ -199,11 +199,11 @@ class Runner(object):
             # check for long env+inference times (per env)
             # skip first 10 measurements (optimistic, discard start jitter)
             if max_step_t is not None and self._total_steps > 10:
-                step_t = (time.time() - time_0) / len(self.obs)
+                step_t = (time.time() - time_0) / len(rewards)
                 # smooth ~100sh
                 self._step_t_ravg = step_t if self._step_t_ravg is None else self._step_t_ravg * .99 + step_t * .01
                 if self._step_t_ravg > max_step_t:
-                    print('! {} > {}'.format(self._step_t_ravg, max_step_t))
+                    print('! {} {} > {}'.format(self._total_steps * len(rewards), self._step_t_ravg, max_step_t))
                     if self._total_steps > 100:
                         raise _MaxStepException(self._step_t_ravg)
 
