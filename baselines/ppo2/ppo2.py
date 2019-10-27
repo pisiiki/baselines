@@ -387,7 +387,7 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
             for _ in range(noptepochs):
                 np.random.shuffle(envinds)
                 for start in range(0, nenvs, envsperbatch):
-                    if wall_t_end is not None and time.time() > wall_t_end and update >= 1:
+                    if wall_t_end is not None and time.time() > wall_t_end and update > 1:
                         return terminate()
 
                     end = start + envsperbatch
