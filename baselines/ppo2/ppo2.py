@@ -349,7 +349,7 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
             return terminate()
 
         if wall_t_end is not None:
-            frac = min(1.,(t_update_start - wall_t_start) / (wall_t_end-wall_t_start))
+            frac = min(1., (t_update_start - wall_t_start) / (wall_t_end - wall_t_start))
         elif total_timesteps is not None:
             frac = max(frac, 1.0 - (update - 1.0) / nupdates)
 
@@ -387,7 +387,7 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
             for _ in range(noptepochs):
                 np.random.shuffle(envinds)
                 for start in range(0, nenvs, envsperbatch):
-                    if wall_t_end is not None and time.time() > wall_t_end:
+                    if wall_t_end is not None and time.time() > wall_t_end and update >= 1:
                         return terminate()
 
                     end = start + envsperbatch
