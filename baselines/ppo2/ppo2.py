@@ -15,16 +15,6 @@ import gym.spaces
 def _default_fn_create_optimizer(lr):
     return tf.train.AdamOptimizer(learning_rate=lr, epsilon=1e-5)
 
-class _MaxInfereceException(Exception):
-    def __init__(self, t:float):
-        super().__init__()
-        self.t = t
-
-class _MaxStepException(Exception):
-    def __init__(self, t:float):
-        super().__init__()
-        self.t = t
-
 class Model(object):
     def __init__(self, *, policy, ob_space, ac_space, nbatch_act, nbatch_train, nsteps, ent_coef, vf_coef,
                 max_grad_norm, fn_create_optimizer = _default_fn_create_optimizer):
@@ -128,8 +118,12 @@ class Model(object):
         self.load = load
         tf.global_variables_initializer().run(session=sess) #pylint: disable=E1101
 
-class Runner(object):
+class TerminateException(Exception):
+    def __init__(self, result):
+        super().__init__()
+        self.result = result
 
+class Runner(object):
     def __init__(self, *, env, model, nsteps, gamma, lam):
         self.env = env
         self.model = model
@@ -153,8 +147,7 @@ class Runner(object):
         self.nsteps = nsteps
         self.states = model.initial_state
         self.dones = [False for _ in range(nenv)]
-        self._total_steps = 0
-        self._step_t_ravg = None
+
 
     def run_no_stats(self):
         for i in range(self.nsteps):
@@ -166,7 +159,8 @@ class Runner(object):
             else:
                 self.obs[:] = obs
 
-    def run(self, max_inference_t=None, max_step_t=None):
+
+    def run(self, fn_on_step):
         mb_rewards, mb_actions, mb_values, mb_dones, mb_neglogpacs = [],[],[],[],[]
         if type(self.env.observation_space) is gym.spaces.Tuple:
             mb_obs = tuple([] for _ in range(len(self.obs)))
@@ -175,15 +169,9 @@ class Runner(object):
         mb_states = self.states
         epinfos = []
         for nstep in range(self.nsteps):
-            self._total_steps += 1
             time_0 = time.time()
             actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones)
-
-            # check for long inference times (per minibatch)
-            if max_inference_t is not None and self._total_steps > 100 and self._total_steps > self.nsteps:
-                inference_t = (time.time() - time_0)
-                if inference_t > max_inference_t:
-                    raise _MaxInfereceException(inference_t)
+            time_1 = time.time()
 
             if type(self.env.observation_space) is gym.spaces.Tuple:
                 for i in range(len(self.obs)):
@@ -195,17 +183,12 @@ class Runner(object):
             mb_neglogpacs.append(neglogpacs)
             mb_dones.append(self.dones)
             obs, rewards, self.dones, infos = self.env.step(actions)
+            time_2 = time.time()
 
-            # check for long env+inference times (per env)
-            # skip first 10 measurements (optimistic, discard start jitter)
-            if max_step_t is not None and self._total_steps > 10:
-                step_t = (time.time() - time_0) / len(rewards)
-                # smooth ~100sh
-                self._step_t_ravg = step_t if self._step_t_ravg is None else self._step_t_ravg * .99 + step_t * .01
-                if self._step_t_ravg > max_step_t:
-                    print('! {} {} > {}'.format(self._total_steps * len(rewards), self._step_t_ravg, max_step_t))
-                    if self._total_steps > 100 and self._total_steps > self.nsteps:
-                        raise _MaxStepException(self._step_t_ravg)
+            if fn_on_step is not None:
+                result = fn_on_step(time_1 - time_0, time_2 - time_0)
+                if result is not None:
+                    raise TerminateException(result)
 
             if type(self.env.observation_space) is gym.spaces.Tuple:
                 for dst, src in zip(self.obs, obs):
@@ -267,9 +250,9 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
           save_interval=0,
 
           total_timesteps=None,
-          wall_t_end=None, wall_t_start=None,
-          max_step_t=None,
-          max_inference_t = None,
+          wall_t_start=None,
+          fn_wall_t_end=None,
+          fn_on_step=None,
 
           fn_create_optimizer=None,
           close_env = True,
@@ -282,8 +265,7 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
     else: assert callable(cliprange)
 
     assert total_timesteps is None or (type(total_timesteps) is int and total_timesteps > 0)
-    assert (wall_t_end is None and wall_t_start is None) or \
-        (type(wall_t_start) is float and type(wall_t_end) is float and wall_t_start >= 0. and wall_t_end > 0.)
+    # assert wall_t_end is None or (type(wall_t_end) is float and wall_t_end > 0.)
 
     nenvs = env.num_envs
     ob_space = env.observation_space
@@ -328,13 +310,13 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
         if np.isinf(mblossvals).any():
             raise RuntimeError('Inf. in PPO2 mblossvals ({} updates).'.format(update))
 
-    def terminate():
+    def terminate(result=None):
         check_stability()
         if save_interval:
             save()
         if close_env:
             env.close()
-        return model
+        return model, result
 
     runner_run_t_total = 0.
     t_first_update_start = time.time()
@@ -348,23 +330,21 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
         if total_timesteps is not None and update == nupdates + 1:
             return terminate()
 
-        if wall_t_end is not None:
-            frac = min(1., (t_update_start - wall_t_start) / (wall_t_end - wall_t_start))
+        if fn_wall_t_end() is not None:
+            frac = min(1., (t_update_start - wall_t_start) / (fn_wall_t_end() - wall_t_start))
         elif total_timesteps is not None:
             frac = max(frac, 1.0 - (update - 1.0) / nupdates)
 
         lrnow = lr(frac)
+        assert lrnow > 0.
 
         cliprangenow = cliprange(frac)
+        assert cliprangenow > 0.
 
         try:
-            obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run(max_inference_t, max_step_t)
-        except _MaxInfereceException as e:
-            model.avg_inference_t = e.t
-            return terminate()
-        except _MaxStepException as e:
-            model.avg_step_t = e.t
-            return terminate()
+            obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run(fn_on_step)
+        except TerminateException as e:
+            return terminate(e.result)
 
         epinfobuf.extend(epinfos)
         if states is None: # nonrecurrent version
@@ -387,8 +367,10 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
             for _ in range(noptepochs):
                 np.random.shuffle(envinds)
                 for start in range(0, nenvs, envsperbatch):
-                    if wall_t_end is not None and time.time() > wall_t_end and update > 1:
+                    '''
+                    if fn_wall_t_end is not None and time.time() > fn_wall_t_end() and update > 1:
                         return terminate()
+                    '''
 
                     end = start + envsperbatch
                     mbenvinds = envinds[start:end]
