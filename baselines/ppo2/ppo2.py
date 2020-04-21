@@ -342,7 +342,9 @@ def learn(*, policy, env, nsteps, ent_coef, lr,
         assert cliprangenow > 0.
 
         try:
-            obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run(fn_on_step)
+            obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run(
+                fn_on_step if update > 1 else None
+            )
         except TerminateException as e:
             return terminate(e.result)
 
